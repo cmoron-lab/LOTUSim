@@ -96,6 +96,19 @@ install(
 )
 
 #============================================================================
+# Tests
+#============================================================================
+if(BUILD_TESTING)
+  find_package(ament_cmake_gtest REQUIRED)
+  ament_add_gtest(test_xdyn_serialization test/test_xdyn_serialization.cpp)
+  if(TARGET test_xdyn_serialization)
+    target_include_directories(test_xdyn_serialization PRIVATE
+      ${CMAKE_CURRENT_SOURCE_DIR}/include)
+    target_link_libraries(test_xdyn_serialization gz-sim8::gz-sim8)
+  endif()
+endif()
+
+#============================================================================
 # Export
 #============================================================================
 ament_export_targets(export_physics_interface_plugin HAS_LIBRARY_TARGET)

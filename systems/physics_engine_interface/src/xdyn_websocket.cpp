@@ -9,6 +9,8 @@
  */
 #include "physics_engine_interface/xdyn_websocket.hpp"
 
+#include "physics_engine_interface/xdyn_serialization.hpp"
+
 namespace lotusim::gazebo {
 
 gz::math::Quaterniond quatNedToEnu(const gz::math::Quaterniond& q_ned)
@@ -265,11 +267,11 @@ void XdynWebsocket::onMessage(
         reply["y"].back().get<double>(),
         reply["z"].back().get<double>());
 
-    auto ned_quad = gz::math::Quaterniond(
+    auto ned_quad = quatFromXdynFields(
         reply["qr"].back().get<double>(),
         reply["qi"].back().get<double>(),
-        reply["qk"].back().get<double>(),
-        reply["qj"].back().get<double>());
+        reply["qj"].back().get<double>(),
+        reply["qk"].back().get<double>());
 
     auto gz_position = vecNedToEnu(ned_position);
     auto gz_quad = quatNedToEnu(ned_quad);
@@ -306,6 +308,7 @@ XdynWebsocket::getNewState(
 {
     gz::math::Vector3d ned_position = vecEnuToNed(previous_state.pose.Pos());
     gz::math::Quaterniond ned_quad = quatEnuToNed(previous_state.pose.Rot());
+    const auto ned_quad_fields = quatToXdynFields(ned_quad);
     gz::math::Vector3d ned_lin_vel = vecEnuToNed(previous_state.lin_vel);
     gz::math::Vector3d ned_angular_vel = vecEnuToNed(previous_state.ang_vel);
 
@@ -317,10 +320,10 @@ XdynWebsocket::getNewState(
         {"x", ned_position.X()},
         {"y", ned_position.Y()},
         {"z", ned_position.Z()},
-        {"qi", ned_quad.X()},
-        {"qj", ned_quad.Y()},
-        {"qk", ned_quad.Z()},
-        {"qr", ned_quad.W()},
+        {"qi", ned_quad_fields.qi},
+        {"qj", ned_quad_fields.qj},
+        {"qk", ned_quad_fields.qk},
+        {"qr", ned_quad_fields.qr},
         {"u", ned_lin_vel.X()},
         {"v", ned_lin_vel.Y()},
         {"w", ned_lin_vel.Z()},
