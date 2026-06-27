@@ -103,17 +103,42 @@ bool XdynWebsocket::createConnection(
     }
     m_uri[_entity] = uri;
 
-    if (_sdf->HasElement("thrusters") && m_vessels_cmd_map_ptr) {
-        auto sdfPtr_thruster = _sdf->GetElement("thrusters")->GetFirstElement();
-        auto thrusters_cmd = json::object();
-        do {
-            std::string thruster_name = sdfPtr_thruster->Get<std::string>();
-            thrusters_cmd[thruster_name + "(rpm)"] = 2.0;
-            thrusters_cmd[thruster_name + "(P/D)"] = 0.79;
-            thrusters_cmd[thruster_name + "(beta)"] = 0.0;
-            sdfPtr_thruster = sdfPtr_thruster->GetNextElement();
-        } while (sdfPtr_thruster != sdf::ElementPtr(nullptr));
-        (*m_vessels_cmd_map_ptr)[_entity] = thrusters_cmd.dump();
+    if (m_vessels_cmd_map_ptr) {
+        auto initial_cmd = json::object();
+
+        // Propellers: each <thrusters> entry seeds its rpm/pitch/beta signals.
+        if (_sdf->HasElement("thrusters")) {
+            auto sdfPtr_thruster =
+                _sdf->GetElement("thrusters")->GetFirstElement();
+            do {
+                std::string thruster_name = sdfPtr_thruster->Get<std::string>();
+                initial_cmd[thruster_name + "(rpm)"] = 2.0;
+                initial_cmd[thruster_name + "(P/D)"] = 0.79;
+                initial_cmd[thruster_name + "(beta)"] = 0.0;
+                sdfPtr_thruster = sdfPtr_thruster->GetNextElement();
+            } while (sdfPtr_thruster != sdf::ElementPtr(nullptr));
+        }
+
+        // Angle-commanded actuators (rudders, sails, fins): each
+        // <control_surfaces> entry is the full xdyn command signal,
+        // e.g. "rudder(angle)" or "mainsail(sheet)", seeded to 0.0 so that
+        // commands.at(<signal>) does not throw before the first ROS setpoint.
+        // The default seeding from <thrusters> only does not cover these, so a
+        // vessel driven solely by control surfaces would otherwise crash the
+        // co-simulation on its first step.
+        if (_sdf->HasElement("control_surfaces")) {
+            auto sdfPtr_surface =
+                _sdf->GetElement("control_surfaces")->GetFirstElement();
+            do {
+                std::string signal = sdfPtr_surface->Get<std::string>();
+                initial_cmd[signal] = 0.0;
+                sdfPtr_surface = sdfPtr_surface->GetNextElement();
+            } while (sdfPtr_surface != sdf::ElementPtr(nullptr));
+        }
+
+        if (!initial_cmd.empty()) {
+            (*m_vessels_cmd_map_ptr)[_entity] = initial_cmd.dump();
+        }
     }
     return true;
 }
