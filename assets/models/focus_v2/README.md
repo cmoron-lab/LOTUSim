@@ -26,6 +26,32 @@ added-mass and damping value is an engineering estimate** (each marked
 `# ESTIMATED — pending naval-engineer validation`), tuned only to *sail plausibly*.
 This is **not** tank-validated hydrodynamics.
 
+## ⚠️ Numerical stability — use a fine time step
+
+This model is **numerically stiff**. With a **fixed-step rk4 at dt = 0.02 s** it **diverges**
+(vertical position → ∞ → NaN, and the boat appears to spin 360°). This is a **solver artifact,
+not a physics problem**: at **dt = 0.005 s** (or with the adaptive `rkck` solver in standalone
+mode) the boat sails cleanly — no divergence, no uncommanded 360°. Three independent stable
+configurations (rkck@0.02, rk4@0.005, rk4@0.001) agree on the same ~1 m/s reach speed.
+
+Consequences:
+- **Standalone / prediction mode:** run with `-s rkck` (adaptive) or `-s rk4 --dt 0.005`.
+- **Co-simulation:** the websocket step server (`xdyn-for-cs`) requires a monotonic clock, so
+  `rkck` is **not** usable there (it back-tracks in time). Drive it with **`-s rk4` and a step
+  `Dt ≤ 0.005`** (the client controls `Dt` per message), or de-stiffen the model. The gz plugin's
+  default `dt = 0.02` is the value that diverges.
+
+Historical note: the June 2026 "the boat does 360° / diverges" blocker was this stiffness at
+dt = 0.02, *not* broken hydrodynamics. The yaw damping here is modest (directional stability), not
+a crutch.
+
+## Verified points of sail (closed loop)
+
+Measured with a thin Python ↔ `xdyn-for-cs` autopilot (holds a heading, no gz/ROS): honest
+no-go zone (the boat makes **negative** headway pointing into the wind), speed rising toward the
+beam reach, moderate downwind. Sail trim (`mainsail(sheet)`) and steering (`rudder(helm)`) are
+both live, meaningful inputs.
+
 ## Run the demo
 
 Needs the quaternion and `<control_surfaces>` engine fixes. Start an `xdyn-for-cs`

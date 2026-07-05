@@ -103,7 +103,7 @@ bodies:
           row 3: [0,   0,   6.0, 0,   0,   0  ]
           row 4: [0,   0,   0,   1.5, 0,   0  ]
           row 5: [0,   0,   0,   0,   3.0, 0  ]
-          row 6: [0,   0,   0,   0,   0,   0.4]
+          row 6: [0,   0,   0,   0,   0,   2.0]   # yaw: amorti modéré = stabilité de cap (aide le pilotage). PAS un fix du 360 : celui-ci était NUMÉRIQUE (rk4 pas fixe 0.02 trop grossier) — cf README.  # ESTIMATED
 
       # quadratic damping: hull surge resistance + strong lateral/yaw resistance  # ESTIMATED
       - model: quadratic damping
@@ -114,7 +114,7 @@ bodies:
           row 3: [0,    0,    30.0, 0,   0,   0  ]
           row 4: [0,    0,    0,    6.0, 0,   0  ]
           row 5: [0,    0,    0,    0,   8.0, 0  ]
-          row 6: [0,    0,    0,    0,   0,   0.6]
+          row 6: [0,    0,    0,    0,   0,   3.0]   # yaw quad: amorti modéré = stabilité de cap  # ESTIMATED
 
       # ---- SAIL : aerodynamic polar (driven by apparent wind, trimmed by 'sheet') ----
       # Cl/Cd vs the sail angle of attack (= apparent wind angle - sheet command).
