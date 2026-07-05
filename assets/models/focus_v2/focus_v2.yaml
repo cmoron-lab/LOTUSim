@@ -126,8 +126,8 @@ bodies:
         lift coefficient:        [0.00, 0.80, 1.30, 1.40, 1.10, 0.90, 0.70, 0.30, 0.00]
         drag coefficient:        [0.05, 0.08, 0.12, 0.20, 0.45, 0.75, 1.10, 1.30, 1.35]
         calculation point in body frame:           # centre of effort, above deck (Z<0 = up)
-          x: {value: 0.05, unit: m}
-          y: {value: 0.0,  unit: m}
+          x: {value: -0.10, unit: m}                # CoE DERRIÈRE la quille (x=0.03) -> léger weather
+          y: {value: 0.0,  unit: m}                 # helm (lofe) -> tenable au près (avant: 0.05 = lee helm)  # ESTIMATED
           z: {value: -0.45, unit: m}
         angle command: sheet                        # command key -> "mainsail(sheet)"
 
