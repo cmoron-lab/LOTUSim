@@ -266,37 +266,64 @@ validate_lotusim_core_setup() {
     fi
 }
 
+# Oldest Node the UI is known to run on.
+NODE_MAJOR_MIN=18
+
+# Major version of the node on PATH; empty when there is none.
+node_major_version() {
+    command -v node &> /dev/null || return 0
+    local version
+    version="$(node --version 2> /dev/null)" # v18.20.8
+    version="${version#v}"
+    printf '%s' "${version%%.*}"
+}
+
 validate_ui_setup() {
     local errors=0
-    # Check if nvm is available
-    if ! command -v nvm &> /dev/null; then
-        # nvm is a shell function, try to source it
-        if [ -f "$HOME/.nvm/nvm.sh" ]; then
-            source "$HOME/.nvm/nvm.sh"
-        else
-            echo -e "❌ ${RED}Error:${NC} nvm is not installed or not found"
-            errors=$((errors + 1))
-        fi
+    local major
+    major="$(node_major_version)"
+
+    # nvm is one way of getting node, not a requirement. It is a shell function, so it
+    # has to be sourced to be usable -- but only bother when there is no node yet, and
+    # look where the user actually put it. Requiring $HOME/.nvm/nvm.sh turned a working
+    # node into a hard error for anyone using fnm, asdf, a distro package, or an nvm
+    # that respects XDG paths.
+    if [ -z "$major" ]; then
+        local candidates=("$HOME/.nvm/nvm.sh" "$HOME/.config/nvm/nvm.sh")
+        [ -n "${NVM_DIR:-}" ] && candidates=("${NVM_DIR}/nvm.sh" "${candidates[@]}")
+        local nvm_sh
+        for nvm_sh in "${candidates[@]}"; do
+            [ -f "$nvm_sh" ] || continue
+            source "$nvm_sh" &> /dev/null
+            nvm use "$NODE_MAJOR_MIN" &> /dev/null || nvm use default &> /dev/null
+            break
+        done
+        major="$(node_major_version)"
     fi
-    
-    # Check if Node.js 18 is available via nvm
-    if command -v nvm &> /dev/null || type nvm &> /dev/null; then
-        if ! nvm ls 18 &> /dev/null; then
-            echo -e "❌ ${RED}Error:${NC} Node.js version 18 is not installed via nvm"
-            echo -e "   Install with: nvm install 18"
-            errors=$((errors + 1))
-        fi
-    fi
-    
-    # Check backend directory
-    if [ ! -d "$BACKEND_DIR" ]; then
-        echo -e "${RED}Error:${NC} Backend directory not found: $BACKEND_DIR"
+
+    if [ -z "$major" ]; then
+        echo -e "❌ ${RED}Error:${NC} no node found on PATH"
+        echo -e "   Install Node.js ${NODE_MAJOR_MIN} or newer, by whatever means you prefer"
+        echo -e "   (distribution package, nvm, fnm, asdf)."
+        errors=$((errors + 1))
+    elif [ "$major" -lt "$NODE_MAJOR_MIN" ]; then
+        echo -e "❌ ${RED}Error:${NC} node $(node --version) is too old, ${NODE_MAJOR_MIN} or newer is required"
         errors=$((errors + 1))
     fi
-    
+
+    # Check backend directory
+    if [ ! -d "$BACKEND_DIR" ]; then
+        echo -e "❌ ${RED}Error:${NC} backend not found at $BACKEND_DIR"
+        echo -e "   Clone it there, or symlink an existing clone:"
+        echo -e "     ln -s /path/to/LOTUSim-UI-backend $BACKEND_DIR"
+        errors=$((errors + 1))
+    fi
+
     # Check frontend directory
     if [ ! -d "$FRONTEND_DIR" ]; then
-        echo -e "${RED}Error:${NC}: Frontend directory not found: $FRONTEND_DIR"
+        echo -e "❌ ${RED}Error:${NC} frontend not found at $FRONTEND_DIR"
+        echo -e "   Clone it there, or symlink an existing clone:"
+        echo -e "     ln -s /path/to/LOTUSim-UI-frontend $FRONTEND_DIR"
         errors=$((errors + 1))
     fi
 
@@ -382,11 +409,23 @@ run_command() {
         source_environment
         validate_ui_setup
 
+        # `npx` and `npm run` are wrappers: the server is a grandchild, so signalling
+        # the PID recorded below reaped the wrapper and left the real process holding
+        # its port. The next `lotusim ui` then failed with EADDRINUSE, or -- worse --
+        # the UI silently talked to the previous run's backend.
+        #
+        # setsid makes each child a process-group leader, so its PGID equals its PID
+        # and `kill -- -PID` takes the wrapper and everything under it. It also detaches
+        # them from the terminal, which is why the trap below is now the only thing that
+        # stops them; Ctrl+C reaches the script, not them.
         cleanup() {
-        echo -e "${GREEN}Shutting down${NC} backend and frontend..."
-        kill $BACKEND_PID $FRONTEND_PID 2>/dev/null
-        wait $BACKEND_PID $FRONTEND_PID 2>/dev/null
-        exit
+            echo -e "${GREEN}Shutting down${NC} backend and frontend..."
+            local pid
+            for pid in $BACKEND_PID $FRONTEND_PID; do
+                [ -n "$pid" ] && kill -- "-$pid" 2> /dev/null
+            done
+            wait $BACKEND_PID $FRONTEND_PID 2> /dev/null
+            exit
         }
 
         # Set up trap to catch signals
@@ -394,12 +433,12 @@ run_command() {
 
         # Start backend
         cd ${BACKEND_DIR}
-        npx ts-node src/main.ts &
+        setsid npx ts-node src/main.ts &
         BACKEND_PID=$!
 
         # Start frontend
         cd ${FRONTEND_DIR}
-        npm run dev &
+        setsid npm run dev &
         FRONTEND_PID=$!
 
         echo -e "${GREEN}Backend PID:${NC} $BACKEND_PID"
