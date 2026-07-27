@@ -8,14 +8,21 @@ services:
       - /bin/bash
       - -c
       - npx ts-node src/main.ts
+    environment:
+      # The API refuses any other origin. The browser loads the UI from the
+      # frontend service below, so that is the origin it must allow.
+      CORS_ORIGIN: http://localhost
+    # 5000 is what the backend listens on; the published port has to match it
+    # because the UI defaults to reaching the API on localhost:5000.
     ports:
-      - "3000:3000"
+      - "5000:5000"
     restart: unless-stopped
 
   frontend:
     image: lotusim-frontend:latest
+    # 8080 inside: the image runs nginx as a non-root user, which cannot bind 80.
     ports:
-      - "80:80"
+      - "80:8080"
     restart: unless-stopped
 
   lotusim:
