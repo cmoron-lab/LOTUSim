@@ -4,6 +4,11 @@ A wind-driven sailboat for LOTUSim. Unlike the powered vessels in the library, i
 carries **no thruster**: thrust comes from the wind on a **sail**, modelled as an
 xdyn **three-foil rig**.
 
+Everything here is re-authored from published dimensions of the Joysway Focus V2.
+The ecosystem is EPL-2.0: manufacturer CAD and third-party meshes cannot be vendored,
+whatever their apparent convenience, so the hull and rig were measured and rebuilt
+rather than imported.
+
 ## How it is modelled
 
 | Element | xdyn force model | Command |
